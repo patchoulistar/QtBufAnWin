@@ -21,6 +21,11 @@ extern "C" {
 
 #define DEFAULTVALUE "MISSING"
 
+#define TITLESTR "BufAnWin"
+#define SINGE "单份报表"
+#define MULTIPARTITE "多份报表"
+
+
 namespace Ui {
 class BufAnalysisWin;
 }
@@ -40,6 +45,7 @@ public:
     void FreeMessage();
     void setAreaCode(int);
     void setPortalCode(int);
+    void setsWindowTitle(QString);
 private:
     void init();
     Ui::BufAnalysisWin *ui;

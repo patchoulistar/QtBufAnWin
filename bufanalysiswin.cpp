@@ -48,6 +48,7 @@ void BufAnalysisWin::init() {
     model->setHeaderData(9, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
     ui->tableView->setModel(model);
     ui->tableView->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
+    this->setWindowTitle(TITLESTR);
 }
 
 int getByt(QString number){
@@ -151,6 +152,7 @@ void BufAnalysisWin::setInFileName(QString path) {
         return;
     }
     QByteArray paths = path.toLatin1();
+    setsWindowTitle(QFileInfo(path).completeBaseName());
     inBuf = paths.data();
     cleartable();
     FreeMessage();
@@ -273,4 +275,13 @@ void BufAnalysisWin::FileSaveAS() {
             print_bufrmsgs(bufrmsgs, msgcount, path.data());
         }
     }
+}
+
+void BufAnalysisWin::setsWindowTitle(QString FileName){
+    if(isFiles){
+        this->setWindowTitle(QString::fromLocal8Bit(TITLESTR) + QString::fromLocal8Bit("-") + QString::fromLocal8Bit(MULTIPARTITE) + QString::fromLocal8Bit(": ") + FileName);
+    }else{
+        this->setWindowTitle(QString::fromLocal8Bit(TITLESTR) + QString::fromLocal8Bit("-") + QString::fromLocal8Bit(SINGE) + QString::fromLocal8Bit(": ") + FileName);
+    }
+
 }

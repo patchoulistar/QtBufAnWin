@@ -34,8 +34,12 @@ void BufAnalysisWin::init() {
     inBuf = NULL;
     isHasMessage = false;
     isHasMessages = false;
+    this->setWindowTitle(TITLESTR);
+
     model = new QStandardItemModel;
+    model3 = new QStandardItemModel;
     model->setColumnCount(CLOUMNCOUNT);
+    model3->setColumnCount(CLOUMNCOUNT2);
     model->setHeaderData(0, Qt::Horizontal, QString::fromLocal8Bit(ELEMENT));
     model->setHeaderData(1, Qt::Horizontal, QString::fromLocal8Bit(DESCRIPTORCODE));
     model->setHeaderData(2, Qt::Horizontal, QString::fromLocal8Bit(POWER));
@@ -46,9 +50,21 @@ void BufAnalysisWin::init() {
     model->setHeaderData(7, Qt::Horizontal, QString::fromLocal8Bit(VALUE2));
     model->setHeaderData(8, Qt::Horizontal, QString::fromLocal8Bit(UNIT));
     model->setHeaderData(9, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
+
+    model3->setHeaderData(0, Qt::Horizontal, QString::fromLocal8Bit(DESCRIPTORCODE));
+    model3->setHeaderData(1, Qt::Horizontal, QString::fromLocal8Bit(POWER));
+    model3->setHeaderData(2, Qt::Horizontal, QString::fromLocal8Bit(BASE));
+    model3->setHeaderData(3, Qt::Horizontal, QString::fromLocal8Bit(WIDTH));
+    model3->setHeaderData(4, Qt::Horizontal, QString::fromLocal8Bit(VALUE2));
+    model3->setHeaderData(5, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
+
     ui->tableView->setModel(model);
     ui->tableView->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
-    this->setWindowTitle(TITLESTR);
+
+    ui->tableView_2->setModel(model3);
+    ui->tableView_2->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
+    ui->tabWidget->setStyleSheet("QTabWidget::pane {border:0; }");
+    ui->tabWidget->setCurrentIndex(0);  //默认选择第一页
 }
 
 int getByt(QString number){
@@ -130,6 +146,21 @@ int modify_print_sec4(double *value, int n, char * cval, int cvallen, Descriptor
     return 0;
 }
 
+
+int print_sec3(/*double *value, */DescriptorItem * pdes, void * pother){
+    BufAnalysisWin *se = (BufAnalysisWin*)pother;
+    int i = 0;
+    QList<QStandardItem*> items;
+    items.append(new QStandardItem(QString(pdes->code))); //描述符代码
+    items.append(new QStandardItem(QString::number(pdes->power))); //比例因子
+    items.append(new QStandardItem(QString::number(pdes->base))); //基值
+    items.append(new QStandardItem(QString::number(pdes->width))); //宽度
+    items.append(new QStandardItem(""));  //可能是值  备用
+    items.append(new QStandardItem(QString(pdes->describe)));
+    se->appendRow3(items);
+    return 0;
+}
+
 int getWMO(double *value, int n, char * cval, int cvallen, DescriptorItem * pdes, int si, void * pother) {
     BufAnalysisWin *se = (BufAnalysisWin*)pother;
     if (QString::fromLocal8Bit(pdes->code) == "001001") {
@@ -142,7 +173,7 @@ int getWMO(double *value, int n, char * cval, int cvallen, DescriptorItem * pdes
     return 0;
 }
 
-void BufAnalysisWin::setInFileName(QString path) {
+void BufAnalysisWin::setInFileName(QString path){
     if (path == "") {
         return;
     }
@@ -221,19 +252,35 @@ void BufAnalysisWin::DisplayInformations() {
     ui->listWidget->setCurrentRow(0);
 }
 
+void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
+    DescriptorItem * head = psec3->pdescriptorHead;
+    for(int i = 0; i < psec3->descriptorCount; i++){
+        print_sec3(head, this);
+        head = head->next;
+    }
+}
+
+
 void BufAnalysisWin::FillInformations(int Row) {
     model->removeRows(0, model->rowCount());
     if (isHasMessage) {
         process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &modify_print_sec4, this);
+        AnalsisSec3(&(bufrmsg.sec3));
     }
     else {
         process_bufrsec4(&(bufrmsgs[Row].sec4), &(bufrmsgs[Row].sec3), &modify_print_sec4, this);
+        AnalsisSec3(&(bufrmsgs[Row].sec3));
     }
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
+    ui->tableView_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
 }
 
 void BufAnalysisWin::appendRow(QList<QStandardItem*>& items) {
     model->appendRow(items);
+}
+
+void BufAnalysisWin::appendRow3(QList<QStandardItem*>& items) {
+    model3->appendRow(items);
 }
 
 void BufAnalysisWin::cleartable() {

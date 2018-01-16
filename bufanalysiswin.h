@@ -8,6 +8,7 @@ extern "C" {
 }
 
 #define CLOUMNCOUNT 10
+#define CLOUMNCOUNT2 6
 #define ELEMENT "元素数"
 #define DESCRIPTORCODE "描述符代码"
 #define POWER "比例因子"
@@ -40,12 +41,14 @@ public:
     void OpenFileAction();
     void OpenFilesAction();
     void appendRow(QList<QStandardItem*>&);
+    void appendRow3(QList<QStandardItem*>&);
     void cleartable();
     int readmessage();
     void FreeMessage();
     void setAreaCode(int);
     void setPortalCode(int);
     void setsWindowTitle(QString);
+    void AnalsisSec3(Section3Info * psec3);
 private:
     void init();
     Ui::BufAnalysisWin *ui;
@@ -54,6 +57,7 @@ private:
     BufrMessage *bufrmsgs;
     int *codecount;
     QStandardItemModel * model;
+    QStandardItemModel * model3;
     bool isFiles;
     int msgcount;
     bool isHasMessage;

@@ -12,6 +12,7 @@ BufAnalysisWin::BufAnalysisWin(QWidget *parent) :
 {
     ui->setupUi(this);
     init();
+    /*绑定所需要功能的信号槽*/
     connect(ui->OpenFile, &QAction::triggered, this, &BufAnalysisWin::OpenFileAction);
     connect(ui->OpenFiles, &QAction::triggered, this, &BufAnalysisWin::OpenFilesAction);
     connect(this, SIGNAL(send_sig_to_setInFileName(QString)), this, SLOT(setInFileName(QString)));
@@ -26,11 +27,12 @@ BufAnalysisWin::BufAnalysisWin(QWidget *parent) :
 
 BufAnalysisWin::~BufAnalysisWin()
 {
-    FreeMessage();
+    FreeMessage();  //释放内存
     delete ui;
 }
 
 void BufAnalysisWin::init() {
+    /*初始化各项变量, 初始化两个表格格式*/
     inBuf = NULL;
     isHasMessage = false;
     isHasMessages = false;
@@ -68,6 +70,7 @@ void BufAnalysisWin::init() {
 }
 
 int getByt(QString number){
+    /*二进制字符串转十进制整型函数*/
     if(number == NULL){
         return 0;
     }
@@ -82,6 +85,7 @@ int getByt(QString number){
 
 
 int modify_print_sec4(double *value, int n, char * cval, int cvallen, DescriptorItem * pdes, int si, void * pother){
+    /*库的信息处理函数, 显示在表格上*/
     BufAnalysisWin *se = (BufAnalysisWin*)pother;
     int i = 0;
     QList<QStandardItem*> items;
@@ -148,8 +152,8 @@ int modify_print_sec4(double *value, int n, char * cval, int cvallen, Descriptor
 
 
 int print_sec3(/*double *value, */DescriptorItem * pdes, void * pother){
+    /*填充数据段3表格内容*/
     BufAnalysisWin *se = (BufAnalysisWin*)pother;
-    int i = 0;
     QList<QStandardItem*> items;
     items.append(new QStandardItem(QString(pdes->code))); //描述符代码
     items.append(new QStandardItem(QString::number(pdes->power))); //比例因子
@@ -162,6 +166,7 @@ int print_sec3(/*double *value, */DescriptorItem * pdes, void * pother){
 }
 
 int getWMO(double *value, int n, char * cval, int cvallen, DescriptorItem * pdes, int si, void * pother) {
+    /*此函数只用于获取省号和站号,得到的数据用来填充左侧列表*/
     BufAnalysisWin *se = (BufAnalysisWin*)pother;
     if (QString::fromLocal8Bit(pdes->code) == "001001") {
         se->setAreaCode(int(*value));
@@ -174,6 +179,7 @@ int getWMO(double *value, int n, char * cval, int cvallen, DescriptorItem * pdes
 }
 
 void BufAnalysisWin::setInFileName(QString path){
+    /*保存要读取文件的路径, 判断是否为规定的后缀*/
     if (path == "") {
         return;
     }
@@ -191,21 +197,26 @@ void BufAnalysisWin::setInFileName(QString path){
 }
 
 void BufAnalysisWin::OpenFileAction() {
+    /*打开文件获得路径名,设置对应变量将路径作为信号参数发出*/
     QString fileName = QFileDialog::getOpenFileName(this, QString::fromLocal8Bit("打开单份报表文件"), "", tr("AllFile(*.*);;b(*.b);;bin(*.bin)"));
     isFiles = false;
     emit send_sig_to_setInFileName(fileName);
 }
 
 void BufAnalysisWin::OpenFilesAction() {
+    /*打开文件获得路径名,将路径作为信号参数发出*/
     QString fileName = QFileDialog::getOpenFileName(this, QString::fromLocal8Bit("打开多份报表文件"), "", tr("AllFile(*.*);;b(*.b);;bin(*.bin)"));
     isFiles = true;
     emit send_sig_to_setInFileName(fileName);
 }
 
 void BufAnalysisWin::GetBufrMessage() {
+    /*调用接口函数,得到返回错误码, 如果打开的是多个报表的文件保存报表份数, 如果不是, 则判断文件的错误码, 然后发送调用槽信号*/
     int ret = readmessage();
-    if (ret > 0) {
-        msgcount = ret;
+    if(isHasMessage){
+        if (ret > 0) {
+            msgcount = ret;
+        }
     }
     if (ret < IGNORE) {
         QMessageBox::warning(this, QString::fromLocal8Bit("打开文件失败"), QString::fromLocal8Bit("错误代码: " + ret));
@@ -221,6 +232,7 @@ void BufAnalysisWin::GetBufrMessage() {
 }
 
 int BufAnalysisWin::readmessage() {
+    /*根据打开的按钮不同, 调用不同的分析接口函数并返回对应的值*/
     bufr_init(NULL);
     if (!isFiles) {
         isHasMessage = true;
@@ -233,6 +245,7 @@ int BufAnalysisWin::readmessage() {
 }
 
 void BufAnalysisWin::DisplayInformation() {
+    /*填充左则列表, 并自动选择第一项(单份报表文件只有第一项)*/
     process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &getWMO, this);
     ui->listWidget->addItem(new QListWidgetItem(QString::number(AreaCode) + QString::number(PortalCode)));
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
@@ -240,6 +253,7 @@ void BufAnalysisWin::DisplayInformation() {
 }
 
 void BufAnalysisWin::DisplayInformations() {
+    /*根据多报表文件解析返回的份数,遍历填充左则列表*/
     for (int i = 1; i <= msgcount; i++) {
         process_bufrsec4(&(bufrmsgs[i - 1].sec4), &(bufrmsgs[i - 1].sec3), &getWMO, this);
         if (codecount[i-1] < IGNORE) {
@@ -253,6 +267,7 @@ void BufAnalysisWin::DisplayInformations() {
 }
 
 void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
+    /*填充数据段3表格*/
     DescriptorItem * head = psec3->pdescriptorHead;
     for(int i = 0; i < psec3->descriptorCount; i++){
         print_sec3(head, this);
@@ -262,6 +277,7 @@ void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
 
 
 void BufAnalysisWin::FillInformations(int Row) {
+    /*先清空表格内容, 再根据标识填充表格*/
     model->removeRows(0, model->rowCount());
     if (isHasMessage) {
         process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &modify_print_sec4, this);
@@ -271,7 +287,7 @@ void BufAnalysisWin::FillInformations(int Row) {
         process_bufrsec4(&(bufrmsgs[Row].sec4), &(bufrmsgs[Row].sec3), &modify_print_sec4, this);
         AnalsisSec3(&(bufrmsgs[Row].sec3));
     }
-    ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
+    ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     ui->tableView_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
 }
 
@@ -284,11 +300,13 @@ void BufAnalysisWin::appendRow3(QList<QStandardItem*>& items) {
 }
 
 void BufAnalysisWin::cleartable() {
+    /*清空两个控件*/
     model->removeRows(0, model->rowCount());
     ui->listWidget->clear();
 }
 
 void BufAnalysisWin::FreeMessage() {
+    /*释放内容信息*/
     if (isHasMessage) {
         free_bufrmsg(&bufrmsg);
         isHasMessage = false;
@@ -309,6 +327,7 @@ void BufAnalysisWin::setPortalCode(int code){
 }
 
 void BufAnalysisWin::FileSaveAS() {
+    /*另存为功能, 直接调用库接口函数输出到txt文件中*/
     QString filename = QFileDialog::getSaveFileName(this, QString::fromLocal8Bit("另存为"), "", tr("txt(*.txt);;AllFile(*.*)"));
     if (filename.isEmpty()) {
         return;
@@ -325,6 +344,7 @@ void BufAnalysisWin::FileSaveAS() {
 }
 
 void BufAnalysisWin::setsWindowTitle(QString FileName){
+    /*设置窗口标题*/
     if(isFiles){
         this->setWindowTitle(QString::fromLocal8Bit(TITLESTR) + QString::fromLocal8Bit("-") + QString::fromLocal8Bit(MULTIPARTITE) + QString::fromLocal8Bit(": ") + FileName);
     }else{

@@ -142,6 +142,7 @@ int modify_print_sec4(double *value, int n, char * cval, int cvallen, Descriptor
                 if (n == 1) {
                     items.append(new QStandardItem(""));
                 }
+                QString iis = QString::number(value[i],10, 6);
                 items.append(new QStandardItem(QString::number(value[i], 10, 6))); //值
             }
         }
@@ -251,6 +252,7 @@ int BufAnalysisWin::readmessage() {
 
 void BufAnalysisWin::DisplayInformation() {
     /*填充左则列表, 并自动选择第一项(单份报表文件只有第一项)*/
+    ui->statusBar->showMessage(QString::fromLocal8Bit("单报表"));
     process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &getWMO, this);
     ui->listWidget->addItem(new QListWidgetItem(QString::number(AreaCode) + QString::number(PortalCode)));
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
@@ -259,6 +261,7 @@ void BufAnalysisWin::DisplayInformation() {
 
 void BufAnalysisWin::DisplayInformations() {
     /*根据多报表文件解析返回的份数,遍历填充左则列表*/
+    ui->statusBar->showMessage(QString::fromLocal8Bit("报表份数: ") + QString::number(msgcount));
     for (int i = 1; i <= msgcount; i++) {
         process_bufrsec4(&(bufrmsgs[i - 1].sec4), &(bufrmsgs[i - 1].sec3), &getWMO, this);
         if (codecount[i-1] < IGNORE) {

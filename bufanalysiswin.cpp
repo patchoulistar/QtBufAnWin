@@ -42,22 +42,21 @@ void BufAnalysisWin::init() {
     model3 = new QStandardItemModel;
     model->setColumnCount(CLOUMNCOUNT);
     model3->setColumnCount(CLOUMNCOUNT2);
-    model->setHeaderData(0, Qt::Horizontal, QString::fromLocal8Bit(ELEMENT));
-    model->setHeaderData(1, Qt::Horizontal, QString::fromLocal8Bit(DESCRIPTORCODE));
-    model->setHeaderData(2, Qt::Horizontal, QString::fromLocal8Bit(POWER));
-    model->setHeaderData(3, Qt::Horizontal, QString::fromLocal8Bit(BASE));
-    model->setHeaderData(4, Qt::Horizontal, QString::fromLocal8Bit(WIDTH));
-    model->setHeaderData(5, Qt::Horizontal, QString::fromLocal8Bit(VALUE));
-    model->setHeaderData(6, Qt::Horizontal, QString::fromLocal8Bit(VALUES));
-    model->setHeaderData(7, Qt::Horizontal, QString::fromLocal8Bit(VALUE2));
-    model->setHeaderData(8, Qt::Horizontal, QString::fromLocal8Bit(UNIT));
-    model->setHeaderData(9, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
+    model->setHeaderData(0, Qt::Horizontal, QString::fromLocal8Bit(DESCRIPTORCODE));
+    model->setHeaderData(1, Qt::Horizontal, QString::fromLocal8Bit(POWER));
+    model->setHeaderData(2, Qt::Horizontal, QString::fromLocal8Bit(BASE));
+    model->setHeaderData(3, Qt::Horizontal, QString::fromLocal8Bit(WIDTH));
+    model->setHeaderData(4, Qt::Horizontal, QString::fromLocal8Bit(VALUE));
+    model->setHeaderData(5, Qt::Horizontal, QString::fromLocal8Bit(VALUES));
+    model->setHeaderData(6, Qt::Horizontal, QString::fromLocal8Bit(VALUE2));
+    model->setHeaderData(7, Qt::Horizontal, QString::fromLocal8Bit(UNIT));
+    model->setHeaderData(8, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
 
     model3->setHeaderData(0, Qt::Horizontal, QString::fromLocal8Bit(DESCRIPTORCODE));
     model3->setHeaderData(1, Qt::Horizontal, QString::fromLocal8Bit(POWER));
     model3->setHeaderData(2, Qt::Horizontal, QString::fromLocal8Bit(BASE));
     model3->setHeaderData(3, Qt::Horizontal, QString::fromLocal8Bit(WIDTH));
-    model3->setHeaderData(4, Qt::Horizontal, QString::fromLocal8Bit(VALUE2));
+    model3->setHeaderData(4, Qt::Horizontal, QString::fromLocal8Bit(INFROWIDTH));
     model3->setHeaderData(5, Qt::Horizontal, QString::fromLocal8Bit(DESCRIBE));
 
     ui->tableView->setModel(model);
@@ -66,6 +65,11 @@ void BufAnalysisWin::init() {
     ui->tableView_2->setModel(model3);
     ui->tableView_2->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->tabWidget->setStyleSheet("QTabWidget::pane {border:0; }");
+
+    ui->sec3_edit->setReadOnly(true);
+    ui->sec0_edit->setReadOnly(true);
+    ui->sec1_edit->setReadOnly(true);
+    ui->FileHeadEdit->setReadOnly(true);
     ui->tabWidget->setCurrentIndex(0);  //默认选择第一页
 }
 
@@ -95,7 +99,6 @@ int modify_print_sec4(double *value, int n, char * cval, int cvallen, Descriptor
         items.append(new QStandardItem(QString::number(value[i], 10, 6)));
     }
     else if (pdes->code[0] == '0') {
-        items.append(new QStandardItem(QString::number(n))); //元素数
         items.append(new QStandardItem(QString(pdes->code))); //描述符代码
         items.append(new QStandardItem(QString::number(pdes->power))); //比例因子
         items.append(new QStandardItem(QString::number(pdes->base))); //基值
@@ -159,7 +162,7 @@ int print_sec3(/*double *value, */DescriptorItem * pdes, void * pother){
     items.append(new QStandardItem(QString::number(pdes->power))); //比例因子
     items.append(new QStandardItem(QString::number(pdes->base))); //基值
     items.append(new QStandardItem(QString::number(pdes->width))); //宽度
-    items.append(new QStandardItem(""));  //可能是值  备用
+    items.append(new QStandardItem(QString::number(pdes->infrowidth)));  //附加字段长度
     items.append(new QStandardItem(QString(pdes->describe)));
     se->appendRow3(items);
     return 0;
@@ -191,7 +194,7 @@ void BufAnalysisWin::setInFileName(QString path){
     QByteArray paths = path.toLatin1();
     setsWindowTitle(QFileInfo(path).completeBaseName());
     inBuf = paths.data();
-    cleartable();
+    cleartable(true);
     FreeMessage();
     emit send_sig_to_GetBufrMessage();
 }
@@ -213,7 +216,7 @@ void BufAnalysisWin::OpenFilesAction() {
 void BufAnalysisWin::GetBufrMessage() {
     /*调用接口函数,得到返回错误码, 如果打开的是多个报表的文件保存报表份数, 如果不是, 则判断文件的错误码, 然后发送调用槽信号*/
     int ret = readmessage();
-    if(isHasMessage){
+    if(isHasMessages){
         if (ret > 0) {
             msgcount = ret;
         }
@@ -236,9 +239,11 @@ int BufAnalysisWin::readmessage() {
     bufr_init(NULL);
     if (!isFiles) {
         isHasMessage = true;
+        isHasMessages = false;
         return bufrdec_file(inBuf, &bufrmsg);
     }
     else {
+        isHasMessage = false;
         isHasMessages = true;
         return bufrdecs_file(inBuf, &bufrmsgs, &codecount);
     }
@@ -273,22 +278,37 @@ void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
         print_sec3(head, this);
         head = head->next;
     }
+    ui->sec3_edit->insertPlainText(QString("Length of section3: ") + QString::number(psec3->length) + QString(" bytes\n"));
+    ui->sec3_edit->insertPlainText(QString("Subset count: ") + QString::number(psec3->subsetCount) + QString("\n"));
+    ui->sec3_edit->insertPlainText(QString("Is observe? ") + QString::number(psec3->observe) + QString("\n"));
+    ui->sec3_edit->insertPlainText(QString("Is compress? ") + QString::number(psec3->compress) + QString("\n"));
+    ui->sec3_edit->insertPlainText(QString("Origin descriptors ") + QString::number(psec3->codeCount) + QString("\n"));
+    for(int i = 0; i < psec3->observe; i++){
+        ui->sec3_edit->insertPlainText(QString("[" + QString::number(i+1) +"] ") + &(psec3->originDescriptors[i]) + "\n");
+    }
+    ui->sec3_edit->insertPlainText(QString("Expanded descriptors ") + QString::number(psec3->descriptorCount) + QString("\n"));
 }
 
 
 void BufAnalysisWin::FillInformations(int Row) {
     /*先清空表格内容, 再根据标识填充表格*/
-    model->removeRows(0, model->rowCount());
+    cleartable();
     if (isHasMessage) {
         process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &modify_print_sec4, this);
         AnalsisSec3(&(bufrmsg.sec3));
+        FillFileHead(bufrmsg.phead);
+        FillSec0(bufrmsg.ksec0);
+        FillSec1(bufrmsg.ksec1);
     }
     else {
         process_bufrsec4(&(bufrmsgs[Row].sec4), &(bufrmsgs[Row].sec3), &modify_print_sec4, this);
         AnalsisSec3(&(bufrmsgs[Row].sec3));
+        FillFileHead(bufrmsgs[Row].phead);
+        FillSec0(bufrmsgs[Row].ksec0);
+        FillSec1(bufrmsgs[Row].ksec1);
     }
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    ui->tableView_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
+    ui->tableView_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //设置表头的宽度为(根据内容决定)
 }
 
 void BufAnalysisWin::appendRow(QList<QStandardItem*>& items) {
@@ -299,10 +319,17 @@ void BufAnalysisWin::appendRow3(QList<QStandardItem*>& items) {
     model3->appendRow(items);
 }
 
-void BufAnalysisWin::cleartable() {
-    /*清空两个控件*/
+void BufAnalysisWin::cleartable(bool isClearListWidget) {
+    /*清空内容控件*/
     model->removeRows(0, model->rowCount());
-    ui->listWidget->clear();
+    model3->removeRows(0, model3->rowCount());
+    if(isClearListWidget){
+        ui->listWidget->clear();
+    }
+    ui->FileHeadEdit->clear();
+    ui->sec0_edit->clear();
+    ui->sec1_edit->clear();
+    ui->sec3_edit->clear();
 }
 
 void BufAnalysisWin::FreeMessage() {
@@ -350,5 +377,43 @@ void BufAnalysisWin::setsWindowTitle(QString FileName){
     }else{
         this->setWindowTitle(QString::fromLocal8Bit(TITLESTR) + QString::fromLocal8Bit("-") + QString::fromLocal8Bit(SINGE) + QString::fromLocal8Bit(": ") + FileName);
     }
+
+}
+
+void BufAnalysisWin::FillFileHead(HeadInfo * phead){
+       ui->FileHeadEdit->insertPlainText(QString("Length of file head: " + QString::number(phead->headlen) + " bytes\n"));
+       ui->FileHeadEdit->insertPlainText(QString("Length of message: " + QString::number(phead->msglen) + "bytes\n"));
+       ui->FileHeadEdit->insertPlainText(QString("Format: " + QString::number(phead->format) + "\n"));
+       ui->FileHeadEdit->insertPlainText(QString("Sequence number: " + QString::number(phead->seqnum) + "\n"));
+       ui->FileHeadEdit->insertPlainText(QString("TTAAii: " + QString((char*)phead->ttaaii) + "\n"));
+       ui->FileHeadEdit->insertPlainText(QString("CCCC: " + QString((char*)phead->cccc) + "\n"));
+       ui->FileHeadEdit->insertPlainText(QString("YYGGgg: " + QString((char*)phead->yygg) + "\n"));
+       ui->FileHeadEdit->insertPlainText(QString("BBB: " + QString((char*)phead->bbb)));
+}
+
+void BufAnalysisWin::FillSec0(int * sec0){
+    ui->sec0_edit->insertPlainText(QString("Length of section0: " + QString::number(sec0[0]) + " bytes\n"));
+    ui->sec0_edit->insertPlainText(QString("Total length of Bufr message: " + QString::number(sec0[1]) + " bytes\n"));
+    ui->sec0_edit->insertPlainText(QString("Bufr edition number: " + QString::number(sec0[2]) + "\n"));
+}
+
+void BufAnalysisWin::FillSec1(int * sec1){
+    ui->sec1_edit->insertPlainText(QString("Lenth of section1: " + QString::number(sec1[0]) + " bytes\n"));
+    ui->sec1_edit->insertPlainText(QString("Flag of BUFR master table: " + QString::number(sec1[1]) + " bytes\n"));
+    ui->sec1_edit->insertPlainText(QString("Originating center: " + QString::number(sec1[2]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Originating sub_cnter: " + QString::number(sec1[3]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Update sequence number: " + QString::number(sec1[4]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Flag (presence of Section 2 in the message): " + QString::number(sec1[5]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Bufr message type (Bufr Table A): " + QString::number(sec1[6]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Bufr message sub-type (international): " + QString::number(sec1[7]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Bufr message sub-type (local): " + QString::number(sec1[8]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Version number of Master table used: " + QString::number(sec1[9]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Version number of Master local used: " + QString::number(sec1[10]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Year: " + QString::number(sec1[11]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Month: " + QString::number(sec1[12]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Day: " + QString::number(sec1[13]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Hour: " + QString::number(sec1[14]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Minute: " + QString::number(sec1[15]) + "\n"));
+    ui->sec1_edit->insertPlainText(QString("Second: " + QString::number(sec1[16]) + "\n"));
 
 }

@@ -5,11 +5,62 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <bitset>
+#include <QMutex>
+#include <QString>
+#include <QDateTime>
+#include <QFile>
+#include <QTextStream>
+#include <QtGlobal>
+#include <QDir>
+
+void outputMessage(QtMsgType type, const QMessageLogContext &context, const QString &msg){
+    static QMutex mutex;
+    mutex.lock();
+
+    QString text;
+    switch (type) {
+    case QtDebugMsg:
+        text = QString("Degbug: ");
+        break;
+
+    case QtWarningMsg:
+        text = QString("Warning: ");
+
+    case QtCriticalMsg:
+        text = QString("Critical: ");
+
+    case QtFatalMsg:
+        text = QString("Fatal: ");
+    default:
+        break;
+    }
+
+    //QString context_info = QString("File:(%1) Line:(%2)").arg(QString(context.file)).arg(context.line);
+    QString current_date_time = QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss");
+    QString cureent_date = QString("(%1)").arg(current_date_time);
+    QString message = QString("%1 %2 ---%3--- ").arg(text).arg(cureent_date).arg(msg);
+    QString current_date_day = QDateTime::currentDateTime().toString("yyyy-MM-dd");
+    QFile file("./log/log" + current_date_day + ".txt");
+
+    QDir logdir;
+    QString currentDir = logdir.canonicalPath() + "/log";
+    if(!logdir.exists(currentDir)){
+        logdir.mkpath(currentDir);
+    }
+    file.open(QIODevice::WriteOnly | QIODevice::Append);
+    QTextStream text_stream(&file);
+    text_stream << message << "\r\n";
+    file.flush();
+    file.close();
+
+    mutex.unlock();
+}
 
 BufAnalysisWin::BufAnalysisWin(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::BufAnalysisWin)
 {
+    qDebug("Program started");
     ui->setupUi(this);
     init();
     /*绑定所需要功能的信号槽*/
@@ -23,16 +74,23 @@ BufAnalysisWin::BufAnalysisWin(QWidget *parent) :
     connect(ui->listWidget, SIGNAL(currentRowChanged(int)), this, SLOT(FillInformations(int)));
     connect(ui->save_as, &QAction::triggered, this, &BufAnalysisWin::FileSaveAS);
     connect(ui->quit, &QAction::triggered, this, &BufAnalysisWin::close);
+    qInstallMessageHandler(outputMessage);
+    qDebug("Start to finish");
 }
 
 BufAnalysisWin::~BufAnalysisWin()
 {
     FreeMessage();  //释放内存
     delete ui;
+    qDebug("Program End");
+    qDebug("-----------");
+    qDebug("-----------");
+    qDebug("-----------");
 }
 
 void BufAnalysisWin::init() {
     /*初始化各项变量, 初始化两个表格格式*/
+    qDebug("initialization");
     inBuf = NULL;
     isHasMessage = false;
     isHasMessages = false;
@@ -71,6 +129,7 @@ void BufAnalysisWin::init() {
     ui->sec1_edit->setReadOnly(true);
     ui->FileHeadEdit->setReadOnly(true);
     ui->tabWidget->setCurrentIndex(0);  //默认选择第一页
+    qDebug("initialization over");
 }
 
 int getByt(QString number){
@@ -190,13 +249,18 @@ void BufAnalysisWin::setInFileName(QString path){
     QString sub = QFileInfo(path).suffix();
     if ((sub != "bin" && sub != "b") && (sub != "BIN" && sub != "B")) {
         QMessageBox::warning(this, QString::fromLocal8Bit("错误"), QString::fromLocal8Bit("文件格式不正确!"));
+        qWarning("File open failed");
         return;
     }
     QByteArray paths = path.toLatin1();
-    setsWindowTitle(QFileInfo(path).completeBaseName());
+    QString filename = QFileInfo(path).completeBaseName();
+    setsWindowTitle(filename);
     inBuf = paths.data();
     cleartable(true);
     FreeMessage();
+    QByteArray fname = filename.toLatin1();
+    qDebug("file name");
+    qDebug(fname.data());
     emit send_sig_to_GetBufrMessage();
 }
 
@@ -225,6 +289,7 @@ void BufAnalysisWin::GetBufrMessage() {
     if (ret < IGNORE) {
         QMessageBox::warning(this, QString::fromLocal8Bit("打开文件失败"), QString::fromLocal8Bit("错误代码: " + ret));
         FreeMessage();
+        qWarning("File open failed");
         return;
     }
     if (isFiles) {
@@ -238,6 +303,7 @@ void BufAnalysisWin::GetBufrMessage() {
 int BufAnalysisWin::readmessage() {
     /*根据打开的按钮不同, 调用不同的分析接口函数并返回对应的值*/
     bufr_init(NULL);
+    qDebug("bufr init");
     if (!isFiles) {
         isHasMessage = true;
         isHasMessages = false;
@@ -252,15 +318,18 @@ int BufAnalysisWin::readmessage() {
 
 void BufAnalysisWin::DisplayInformation() {
     /*填充左则列表, 并自动选择第一项(单份报表文件只有第一项)*/
+    qDebug("Numbering start");
     ui->statusBar->showMessage(QString::fromLocal8Bit("单报表"));
     process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &getWMO, this);
     ui->listWidget->addItem(new QListWidgetItem(QString::number(AreaCode) + QString::number(PortalCode)));
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //列自适应列宽
     ui->listWidget->setCurrentRow(0);
+    qDebug("Numbering complete");
 }
 
 void BufAnalysisWin::DisplayInformations() {
     /*根据多报表文件解析返回的份数,遍历填充左则列表*/
+    qDebug("Numbering start");
     ui->statusBar->showMessage(QString::fromLocal8Bit("报表份数: ") + QString::number(msgcount));
     for (int i = 1; i <= msgcount; i++) {
         process_bufrsec4(&(bufrmsgs[i - 1].sec4), &(bufrmsgs[i - 1].sec3), &getWMO, this);
@@ -272,6 +341,7 @@ void BufAnalysisWin::DisplayInformations() {
         }
     }
     ui->listWidget->setCurrentRow(0);
+    qDebug("Numbering complete");
 }
 
 void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
@@ -294,14 +364,20 @@ void BufAnalysisWin::AnalsisSec3(Section3Info *psec3){
 
 
 void BufAnalysisWin::FillInformations(int Row) {
+    if(Row < 0){
+        return;  //切换文件时, 会导致row为-1 从而指针越界
+    }
     /*先清空表格内容, 再根据标识填充表格*/
+    qDebug("table clear start");
     cleartable();
+    qDebug("table clear complete");
     if (isHasMessage) {
         process_bufrsec4(&(bufrmsg.sec4), &(bufrmsg.sec3), &modify_print_sec4, this);
         AnalsisSec3(&(bufrmsg.sec3));
         FillFileHead(bufrmsg.phead);
         FillSec0(bufrmsg.ksec0);
         FillSec1(bufrmsg.ksec1);
+        qDebug("Control fill");
     }
     else {
         process_bufrsec4(&(bufrmsgs[Row].sec4), &(bufrmsgs[Row].sec3), &modify_print_sec4, this);
@@ -309,6 +385,7 @@ void BufAnalysisWin::FillInformations(int Row) {
         FillFileHead(bufrmsgs[Row].phead);
         FillSec0(bufrmsgs[Row].ksec0);
         FillSec1(bufrmsgs[Row].ksec1);
+        qDebug("Control fill");
     }
     ui->tableView->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     ui->tableView_2->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents); //设置表头的宽度为(根据内容决定)
@@ -371,6 +448,7 @@ void BufAnalysisWin::FileSaveAS() {
             print_bufrmsgs(bufrmsgs, msgcount, path.data());
         }
     }
+    qDebug("file save as start");
 }
 
 void BufAnalysisWin::setsWindowTitle(QString FileName){
